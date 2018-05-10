@@ -1,0 +1,159 @@
+---
+title: "Analyzing My Facebook Messages"
+author: "Lathan Liou"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyr)
+library(rvest)
+library(lubridate)
+library(ggplot2)
+library(stringr)
+```
+
+First, I'm going to analyze the messages for one of my friends. I downloaded the data in HTML format, and I scraped using a CSS selector for date only, not including the user or the message!
+
+```{r}
+friend <- read_html("facebook-lathanliou/messages/AkshaySwaminathan_48e865ce79/message.html")
+ 
+friend_df <- friend %>%
+  html_nodes("._3-94") %>% 
+  html_text() %>%
+  data.frame()
+
+#clean data
+friend_df <- friend_df %>% 
+  rename(moment = ".")
+
+#want to split up into more columns
+friend_df$moment <- gsub(" ", ",", friend_df$moment)
+
+#remove extra comma
+TrimMult <- function(x, char=" ") {
+  return(gsub(paste0("^", char, "*|(?<=", char, ")", char, "|", char, "*$"),
+              "", x, perl=T))
+}
+
+friend_df$moment <- TrimMult(friend_df$moment, ",")
+
+friend_df <- friend_df %>%
+  separate(moment, c("month", "day", "year", "time"), ",")
+
+#group by year
+friend_df %>% 
+  group_by(year) %>% 
+  summarise(n = n()) %>% 
+  ggplot(aes(x = year, y = n)) +
+  geom_col(aes(fill = year))
+```
+
+Now I want to take a closer look at message frequency, grouping by month over the years.
+
+```{r}
+#creating day month year variable
+friend_df <- friend_df %>% 
+  mutate(dmy = paste(day, month, year, sep = " "))
+
+# reformat dmy variable
+friend_df$dmy <- dmy(friend_df$dmy)
+
+#automatically categorizes dmy to weeks
+friend_df$week_cut <- as.Date(cut(friend_df$dmy, breaks = "week"))
+
+#automatically categorizes dmy to months
+friend_df$month_cut <- as.Date(cut(friend_df$dmy, breaks = "month"))
+
+#monthly messages over time
+friend_df %>% 
+  group_by(week_cut) %>% 
+  summarise(n = n()) %>% 
+  arrange(week_cut) %>% 
+  ggplot(aes(x = week_cut, y = n)) +
+  geom_col() +
+  scale_x_date(date_breaks = "1 year") +
+  labs(title = "Facebook Messages Exchanged Over Time",
+       subtitle = "With One Friend Since 2015",
+       x = "Date",
+       y = "Number of FB Messages Exchanged") +
+  theme(axis.text.x = element_text(angle = 70, hjust = 1),
+        panel.background = element_rect(fill = "lightblue"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+```
+
+The peak corresponds to when I was studying abroad and decided to use Messenger (normally I used Whatsapp). Otherwise the frequency is low because when I'm in the United States, I tend to text rather than use Messenger.
+
+Now, I want to repeat this analysis with my girlfriend.
+
+```{r}
+gf<- read_html("facebook-lathanliou/messages/ArdenHu_559c55dd37/message.html")
+ 
+gf_df <- gf %>%
+  html_nodes("._3-94") %>% 
+  html_text() %>%
+  data.frame()
+
+#clean data
+gf_df <- gf_df %>% 
+  rename(moment = ".")
+
+#want to split up into more columns
+gf_df$moment <- gsub(" ", ",", gf_df$moment)
+
+gf_df$moment <- TrimMult(gf_df$moment, ",")
+
+gf_df <- gf_df %>%
+  separate(moment, c("month", "day", "year", "time"), ",")
+
+#group by year
+gf_df %>% 
+  group_by(year) %>% 
+  summarise(n = n()) %>% 
+  ggplot(aes(x = year, y = n)) +
+  geom_col(aes(fill = year))
+```
+
+```{r}
+#creating day month year variable
+gf_df <-gf_df %>% 
+  mutate(dmy = paste(day, month, year, sep = " "))
+
+# reformat dmy variable
+gf_df$dmy <- dmy(gf_df$dmy)
+
+#automatically categorizes dmy to weeks
+gf_df$week_cut <- as.Date(cut(gf_df$dmy, breaks = "week"))
+
+#automatically categorizes dmy to months
+gf_df$month_cut <- as.Date(cut(gf_df$dmy, breaks = "month"))
+
+#monthly messages over time
+gf_df %>% 
+  group_by(week_cut) %>% 
+  summarise(n = n()) %>% 
+  arrange(week_cut) %>% 
+  ggplot(aes(x = week_cut, y = n)) +
+  geom_col() +
+  scale_x_date(date_breaks = "1 month") +
+  labs(title = "Facebook Messages Exchanged Over Time",
+       subtitle = "With Bebbin Since 2015",
+       x = "Date",
+       y = "Number of FB Messages Exchanged") +
+  theme(axis.text.x = element_text(angle = 70, hjust = 1),
+        panel.background = element_rect(fill = "lightblue"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+```
+# Sources
+\begin{enumerate}
+
+\item http://bradleyboehmke.github.io/2015/12/scraping-html-text.html Learning basic HTML scraping
+
+\item http://www.residualthoughts.com/2018/02/12/analyzing-facebook-messages-in-r/ Inspiration for Facebook Messenger Analysis
+
+\item Max Ghenis https://stackoverflow.com/questions/23274035/removing-multiple-commas-and-trailing-commas-using-gsub?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa Great function for regex manipulation
+
+\end{enumerate}
